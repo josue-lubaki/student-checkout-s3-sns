@@ -1,0 +1,65 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: 'studentcheckout-s3sns
+
+  Sample SAM Template for studentcheckout-s3sns
+
+  '
+Globals:
+  Function:
+    CodeUri: studentcheckout
+    Runtime: java11
+    MemorySize: 512
+    Timeout: 20
+Resources:
+  StudentCheckoutBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName:
+        Fn::Sub: ${AWS::StackName}-${AWS::AccountId}-${AWS::Region}
+  StudentCheckoutTopic:
+    Type: AWS::SNS::Topic
+  GradeCalculatorFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: ca.josue.aws.lambda.GradeCalculator::handler
+      Architectures:
+      - x86_64
+      Policies:
+      - S3ReadPolicy:
+          BucketName:
+            Fn::Sub: ${AWS::StackName}-${AWS::AccountId}-${AWS::Region}
+      - SNSPublishMessagePolicy:
+          TopicName:
+            Fn::GetAtt:
+            - StudentCheckoutTopic
+            - TopicName
+      Environment:
+        Variables:
+          STUDENT_CHECKOUT_TOPIC:
+            Ref: StudentCheckoutTopic
+      Events:
+        S3Event:
+          Type: S3
+          Properties:
+            Bucket:
+              Ref: StudentCheckoutBucket
+            Events: s3:ObjectCreated:*
+      CodeUri: GradeCalculatorFunction
+    Metadata:
+      SamResourceId: GradeCalculatorFunction
+  ReportGeneratorFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: ca.josue.aws.lambda.ReportGenerator::handler
+      Architectures:
+      - x86_64
+      Events:
+        HelloWorld:
+          Type: SNS
+          Properties:
+            Topic:
+              Ref: StudentCheckoutTopic
+      CodeUri: ReportGeneratorFunction
+    Metadata:
+      SamResourceId: ReportGeneratorFunction
