@@ -12,6 +12,8 @@ Globals:
     MemorySize: 512
     Timeout: 20
 Resources:
+  StudentCheckoutDLQ:
+    Type: AWS::SNS::Topic
   StudentCheckoutBucket:
     Type: AWS::S3::Bucket
     Properties:
@@ -25,6 +27,10 @@ Resources:
       Handler: ca.josue.aws.lambda.GradeCalculator::handler
       Architectures:
       - x86_64
+      DeadLetterQueue:
+        Type: SNS
+        TargetArn:
+          Ref: StudentCheckoutDLQ
       Policies:
       - S3ReadPolicy:
           BucketName:
@@ -55,7 +61,7 @@ Resources:
       Architectures:
       - x86_64
       Events:
-        HelloWorld:
+        SNSEvent:
           Type: SNS
           Properties:
             Topic:
@@ -63,3 +69,18 @@ Resources:
       CodeUri: ReportGeneratorFunction
     Metadata:
       SamResourceId: ReportGeneratorFunction
+  ErrorHandlerFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: ca.josue.aws.lambda.errorhandling.ErrorHandler::handler
+      Architectures:
+      - x86_64
+      Events:
+        SNSEvent:
+          Type: SNS
+          Properties:
+            Topic:
+              Ref: StudentCheckoutDLQ
+      CodeUri: ErrorHandlerFunction
+    Metadata:
+      SamResourceId: ErrorHandlerFunction

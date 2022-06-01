@@ -8,6 +8,6 @@ architecture = "x86_64"
 handler = "ca.josue.aws.lambda.GradeCalculator::handler"
 manifest_hash = ""
 packagetype = "Zip"
-functions = ["GradeCalculatorFunction", "ReportGeneratorFunction"]
+functions = ["GradeCalculatorFunction", "ReportGeneratorFunction", "ErrorHandlerFunction"]
 
 [layer_build_definitions]

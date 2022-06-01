@@ -14,6 +14,9 @@ Globals:
     Timeout: 20
 
 Resources:
+  StudentCheckoutDLQ:
+    Type: AWS::SNS::Topic
+
   StudentCheckoutBucket:
     Type: AWS::S3::Bucket
     Properties:
@@ -28,6 +31,9 @@ Resources:
       Handler: ca.josue.aws.lambda.GradeCalculator::handler
       Architectures:
         - x86_64
+      DeadLetterQueue:
+        Type: SNS
+        TargetArn: !Ref StudentCheckoutDLQ
       Policies:
         - S3ReadPolicy:
             BucketName : !Sub ${AWS::StackName}-${AWS::AccountId}-${AWS::Region}
@@ -50,7 +56,19 @@ Resources:
       Architectures:
         - x86_64
       Events:
-        HelloWorld:
+        SNSEvent:
           Type: SNS # More info about API Event Source: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#api
           Properties:
             Topic: !Ref StudentCheckoutTopic
+
+  ErrorHandlerFunction:
+    Type: AWS::Serverless::Function # More info about Function Resource: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#awsserverlessfunction
+    Properties:
+      Handler: ca.josue.aws.lambda.errorhandling.ErrorHandler::handler
+      Architectures:
+        - x86_64
+      Events:
+        SNSEvent:
+          Type: SNS # More info about API Event Source: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#api
+          Properties:
+            Topic: !Ref StudentCheckoutDLQ

@@ -8,6 +8,8 @@ import com.amazonaws.services.sns.AmazonSNS;
 import com.amazonaws.services.sns.AmazonSNSClientBuilder;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.Arrays;
@@ -19,6 +21,8 @@ public class GradeCalculator {
     private final AmazonS3 s3 = AmazonS3ClientBuilder.defaultClient();
     private final AmazonSNS sns = AmazonSNSClientBuilder.defaultClient();
 
+    private final Logger logger = LoggerFactory.getLogger(GradeCalculator.class);
+
     public void handler(S3Event event) {
         event.getRecords().forEach(record -> {
             S3ObjectInputStream s3ObjectInputStream = s3.getObject(
@@ -27,21 +31,24 @@ public class GradeCalculator {
             ).getObjectContent();
 
             try {
+                logger.info("Reading student checkout events from S3");
                 List<Student> students = Arrays
                         .asList(objectMapper.readValue(s3ObjectInputStream, Student[].class));
                 s3ObjectInputStream.close();
 
                 // publish message to SNS
+                logger.info("Message being published to SNS");
                 publishMessageToSNS(students);
             } catch (IOException e) {
-                throw new RuntimeException(e);
+                logger.error("Exception is : ", e);
+                throw new RuntimeException("Error while processing S3 Event : " + e);
             }
         });
     }
 
     private void publishMessageToSNS(List<Student> students) {
         students.stream()
-                .map(GradeCalculator::calculateGrade)
+                .map(this::calculateGrade)
                 .forEach(student -> {
                     try {
                         sns.publish(
@@ -49,13 +56,14 @@ public class GradeCalculator {
                             objectMapper.writeValueAsString(student)
                         );
                     } catch (JsonProcessingException e) {
-                        throw new RuntimeException(e);
+                        logger.error("Exception on publishing student checkout event to SNS", e);
+                        throw new RuntimeException("Error while publishing student checkout event to SNS : " + e);
                     }
                 });
     }
 
     // solve the grade of the student
-    private static Student calculateGrade(Student student) {
+    private Student calculateGrade(Student student) {
         // below 70% -> C, above 80% -> B and above 80% -> A
         student.grade = student.testScore < 70 ? 'C' : student.testScore < 90 ? 'B' : 'A';
         return student;
